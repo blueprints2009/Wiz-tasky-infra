@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: privileged-nginx
+  labels:
+    app: nginx
+spec:
+  containers:
+    - name: nginx
+      image: nginx:latest
+      securityContext:
+        privileged: true  # ⚠️ Grants full access to the host
+        allowPrivilegeEscalation: true  # Allows privilege escalation
+        capabilities:
+          add:
+            - NET_ADMIN  # Allows network modifications
+            - SYS_TIME   # Allows system time changes
+      ports:
+        - containerPort: 80
