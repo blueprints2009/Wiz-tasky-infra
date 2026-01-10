@@ -16,6 +16,8 @@ resource "aws_iam_role" "ec2_backup_role" {
   tags = merge(var.tags, { Name = "${var.environment}-ec2-backup-role" })
 }
 
+#checkov:skip=CKV_AWS_356:Allowing wildcard for CloudWatch Logs permissions
+#checkov:skip=CKV_AWS_111:Write access needed for CloudWatch Logs
 data "aws_iam_policy_document" "ec2_backup_policy" {
   statement {
     actions = [
