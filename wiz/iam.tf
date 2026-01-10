@@ -1,74 +1,54 @@
-# IAM Role for EC2 Instance (MongoDB server)
-resource "aws_iam_role" "ec2_role" {
-  name = "${var.environment}-ec2-mongodb-role"
+# IAM role and instance profile for EC2 instance to allow S3 uploads (MongoDB backups)
+resource "aws_iam_role" "ec2_backup_role" {
+  name = "${var.environment}-ec2-backup-role"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
-    Statement = [
-      {
-        Action = "sts:AssumeRole"
-        Effect = "Allow"
-        Principal = {
-          Service = "ec2.amazonaws.com"
-        }
+    Statement = [{
+      Effect = "Allow"
+      Principal = {
+        Service = "ec2.amazonaws.com"
       }
-    ]
+      Action = "sts:AssumeRole"
+    }]
   })
 
-  tags = merge(var.tags, { Name = "${var.environment}-ec2-role" })
+  tags = merge(var.tags, { Name = "${var.environment}-ec2-backup-role" })
 }
 
-# IAM Policy for S3 Access (MongoDB backups)
-resource "aws_iam_role_policy" "s3_backup_policy" {
-  name = "${var.environment}-s3-backup-policy"
-  role = aws_iam_role.ec2_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "s3:PutObject",
-          "s3:GetObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
-        ]
-        Resource = [
-          aws_s3_bucket.mongodb_backups.arn,
-          "${aws_s3_bucket.mongodb_backups.arn}/*"
-        ]
-      }
+data "aws_iam_policy_document" "ec2_backup_policy" {
+  statement {
+    actions = [
+      "s3:PutObject",
+      "s3:ListBucket",
+      "s3:GetBucketLocation",
+      "s3:PutObjectAcl"
     ]
-  })
-}
 
-# IAM Policy for CloudWatch Logs
-resource "aws_iam_role_policy" "cloudwatch_policy" {
-  name = "${var.environment}-cloudwatch-policy"
-  role = aws_iam_role.ec2_role.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogStreams"
-        ]
-        Resource = "arn:aws:logs:${var.region}:${data.aws_caller_identity.current.account_id}:log-group:/aws/ec2/mongodb*"
-      }
+    resources = [
+      aws_s3_bucket.mongodb_backups.arn,
+      "${aws_s3_bucket.mongodb_backups.arn}/*"
     ]
-  })
+  }
+
+  statement {
+    actions = [
+      "logs:CreateLogStream",
+      "logs:CreateLogGroup",
+      "logs:PutLogEvents",
+      "logs:DescribeLogStreams"
+    ]
+    resources = ["*"]
+  }
 }
 
-# IAM Instance Profile
+resource "aws_iam_role_policy" "ec2_backup_policy_attach" {
+  name   = "${var.environment}-ec2-backup-policy"
+  role   = aws_iam_role.ec2_backup_role.id
+  policy = data.aws_iam_policy_document.ec2_backup_policy.json
+}
+
 resource "aws_iam_instance_profile" "instance_profile" {
-  name = "${var.environment}-ec2-instance-profile"
-  role = aws_iam_role.ec2_role.name
-
-  tags = merge(var.tags, { Name = "${var.environment}-instance-profile" })
+  name = "${var.environment}-instance-profile"
+  role = aws_iam_role.ec2_backup_role.name
 }
