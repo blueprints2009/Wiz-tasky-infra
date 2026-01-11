@@ -77,10 +77,7 @@ resource "aws_instance" "mongodb" {
     encrypted   = true
   }
 
-  user_data = <<-EOF
-              #!/bin/bash
-              # Initial setup will be done via provisioners
-              EOF
+  user_data = file("${path.module}/scripts/install_mongodb.sh")
 
   tags = merge(var.tags, { Name = "${var.environment}-mongodb-instance" })
 
@@ -130,69 +127,4 @@ resource "aws_s3_bucket_public_access_block" "mongodb_backups_access" {
   restrict_public_buckets = false
 }
 
-# Provisioner to install MongoDB
-resource "null_resource" "install_mongodb" {
-  depends_on = [aws_instance.mongodb]
-
-  triggers = {
-    file_hash = fileexists("${path.module}/scripts/install_mongodb.sh") ? filebase64("${path.module}/scripts/install_mongodb.sh") : ""
-    instance  = aws_instance.mongodb.id
-  }
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = tls_private_key.ssh_key.private_key_pem
-    host        = aws_instance.mongodb.public_ip
-    timeout     = "10m"
-  }
-
-  provisioner "file" {
-    source      = "${path.module}/scripts/install_mongodb.sh"
-    destination = "/home/ubuntu/install_mongodb.sh"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "echo 'MongoDB installation script copied'",
-      "chmod 755 /home/ubuntu/install_mongodb.sh",
-      "sudo /home/ubuntu/install_mongodb.sh"
-    ]
-  }
-}
-
-# Provisioner to setup backup script
-resource "null_resource" "setup_backup" {
-  depends_on = [null_resource.install_mongodb]
-
-  triggers = {
-    file_hash = fileexists("${path.module}/scripts/backup_mongodb.sh") ? filebase64("${path.module}/scripts/backup_mongodb.sh") : ""
-    instance  = aws_instance.mongodb.id
-  }
-
-  connection {
-    type        = "ssh"
-    user        = "ubuntu"
-    private_key = tls_private_key.ssh_key.private_key_pem
-    host        = aws_instance.mongodb.public_ip
-    timeout     = "10m"
-  }
-
-  provisioner "file" {
-    source      = "${path.module}/scripts/backup_mongodb.sh"
-    destination = "/home/ubuntu/backup_mongodb.sh"
-  }
-
-  provisioner "remote-exec" {
-    inline = [
-      "echo 'Backup script copied'",
-      "chmod 755 /home/ubuntu/backup_mongodb.sh",
-      "sudo apt-get update && sudo apt-get install -y jq",
-      "export BUCKET=${aws_s3_bucket.mongodb_backups.id}",
-      "export AWS_REGION=${var.region}",
-      "echo \"0 */2 * * * BUCKET=${aws_s3_bucket.mongodb_backups.id} AWS_REGION=${var.region} /home/ubuntu/backup_mongodb.sh >> /home/ubuntu/mongo_backup.log 2>&1\" | crontab -",
-      "crontab -l",
-      "echo 'Backup cron job configured'"
-    ]
-  }
-}
+# MongoDB install via user_data (no provisioner needed)
