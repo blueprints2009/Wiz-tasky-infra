@@ -17,7 +17,7 @@ variable "mongodb_backup_sa_name" {
 variable "ensure_unique_bucket" {
   description = "If true, append a short random suffix to mongodb_backup_sa_name to help guarantee global uniqueness."
   type        = bool
-  default     = false
+  default     = true
 }
 
 variable "ECR_name" {

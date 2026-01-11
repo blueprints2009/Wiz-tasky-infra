@@ -58,3 +58,20 @@ output "mongodb_private_ip" {
   value       = aws_instance.mongodb.private_ip
   description = "Private IP address of the MongoDB EC2 instance"
 }
+
+output "mongodb_connection_string" {
+  value       = "mongodb://${aws_instance.mongodb.private_ip}:27017"
+  description = "MongoDB connection string for app configuration"
+  sensitive   = false
+}
+
+output "app_deployment_info" {
+  value = {
+    ecr_repo           = aws_ecr_repository.app.repository_url
+    mongodb_ip         = aws_instance.mongodb.private_ip
+    mongodb_connection = "mongodb://${aws_instance.mongodb.private_ip}:27017"
+    cluster_name       = module.eks.cluster_name
+    aws_region         = var.region
+  }
+  description = "Key values for app deployment"
+}
