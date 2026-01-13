@@ -34,6 +34,15 @@ systemctl status mongod --no-pager
 # Install AWS CLI for backups
 apt-get install -y awscli
 
+echo "Configuring MongoDB to listen on all interfaces..."
+
+sed -i 's/^  bindIp:.*/  bindIp: 0.0.0.0/' /etc/mongod.conf
+
+systemctl restart mongod
+
+
 echo "MongoDB installation completed successfully!"
 echo "MongoDB version:"
 mongod --version
+
+
