@@ -6,10 +6,10 @@ terraform {
   required_version = ">= 1.5.0"
 
   backend "s3" {
-    bucket         = "demo-terraform-state-bucket-1"
-    key            = "terraform.tfstate"
-    region         = "us-east-1"
-    encrypt        = true
+    bucket  = "demo-terraform-state-bucket-1"
+    key     = "terraform.tfstate"
+    region  = "us-east-1"
+    encrypt = true
   }
 
   required_providers {
@@ -88,21 +88,54 @@ resource "aws_iam_role_policy_attachment" "eks_cluster_policy" {
 
 # EKS Cluster
 resource "aws_eks_cluster" "main" {
+  #checkov:skip=CKV_AWS_39:Public endpoint needed for CI/CD and kubectl access
+  #checkov:skip=CKV_AWS_38:Public endpoint required for GitHub Actions workflow
+
   name     = "demo-eks"
   role_arn = aws_iam_role.eks_cluster.arn
   version  = "1.32"
 
   vpc_config {
-    subnet_ids = module.vpc.private_subnets
+    subnet_ids              = module.vpc.private_subnets
+    endpoint_public_access  = true
+    endpoint_private_access = false
   }
 
-  enabled_cluster_log_types = ["api", "audit", "authenticator"]
+  # Enable all log types for security monitoring
+  enabled_cluster_log_types = ["api", "audit", "authenticator", "controllerManager", "scheduler"]
+
+  # Secrets encryption using AWS KMS
+  encryption_config {
+    provider {
+      key_arn = aws_kms_key.eks.arn
+    }
+    resources = ["secrets"]
+  }
 
   tags = {
     Environment = "Production"
   }
 
-  depends_on = [aws_iam_role_policy_attachment.eks_cluster_policy]
+  depends_on = [
+    aws_iam_role_policy_attachment.eks_cluster_policy,
+    aws_cloudwatch_log_group.eks
+  ]
+}
+
+# KMS key for EKS secrets encryption
+resource "aws_kms_key" "eks" {
+  description             = "EKS cluster secrets encryption key"
+  deletion_window_in_days = 7
+  enable_key_rotation     = true
+
+  tags = {
+    Environment = "Production"
+  }
+}
+
+resource "aws_kms_alias" "eks" {
+  name          = "alias/eks-demo-cluster"
+  target_key_id = aws_kms_key.eks.key_id
 }
 
 # OIDC Provider for IRSA
