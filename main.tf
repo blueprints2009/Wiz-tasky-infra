@@ -6,7 +6,7 @@ terraform {
   required_version = ">= 1.5.0"
 
   backend "s3" {
-    bucket  = "demo-terraform-state-bucket-1"
+    bucket  = "tasky-app-terraform-bucket"
     key     = "terraform.tfstate"
     region  = "us-east-1"
     encrypt = true
