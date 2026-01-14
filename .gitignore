@@ -35,7 +35,7 @@ package-lock.json
 *.tfstate.*
 .terraform.lock.hcl
 terraform.tfvars
-*.tfvars
+*.tfvars 
 
 # Environment files
 .env
